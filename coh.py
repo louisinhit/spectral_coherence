@@ -1,6 +1,5 @@
 import numpy as np
-import signal
-
+from scipy import signal
 
 def autossca_L_1(x, fs, Np):
     print ('***** This is L (step) is 1 ******')
@@ -26,11 +25,11 @@ def autossca_L_1(x, fs, Np):
         X[:, k] = x[k * step : k * step + Np]
 
     # Windowing
-    a = signal.chebwin(Np, at=100)
+    a = signal.windows.chebwin(Np, at=100)
     XW = X * a[:,None]
 
     # First FFT
-    XF1 = np.fft.fft(XW, axis=0)
+    XF1 = np.fft.fft(XW, axis=0, norm='ortho')
     XF1 = np.fft.fftshift(XF1, axes=0)
 
     # Downconversion
@@ -47,9 +46,10 @@ def autossca_L_1(x, fs, Np):
     XM = XM.T
 
     # Second FFT
-    XF2 = np.fft.fft(XM, axis=0)
+    XF2 = np.fft.fft(XM, axis=0, norm='ortho')
     XF2 = np.fft.fftshift(XF2, axes=0)
     M = np.abs(XF2)
+    print ('mmmmmmmmmmm', M.shape)
 
     alpha_o = np.linspace(-1, 1, 2*N, endpoint=True) * fs
     f_o = np.linspace(-0.5+(0.5/N), 0.5-(0.5/Np), Np, endpoint=True)* fs
@@ -88,10 +88,7 @@ def calc_xspec_block(x, y, t, alpha=0):
     return Suu, Svv
 
 
-def cyclic_periodogram(x, alpha_vec, Np):
- 
-    N_alpha = alpha_vec.shape[0]
-
+def cyclic_periodogram(x, Np):
     print ('***** This is L (step) is 1 ******')
     step = 1
     L = x.shape[-1]
@@ -109,23 +106,45 @@ def cyclic_periodogram(x, alpha_vec, Np):
         N = no
 
     print ('x length', len(x))
+        
+    alpha_vec = np.linspace(-0.5, 0.5, N, endpoint=True)
+    N_alpha = alpha_vec.shape[0]
+    
     # Input Channelization
     X = np.zeros((Np, N), dtype=x.dtype)
 
     for k in range(N):
         X[:, k] = x[k * step : k * step + Np]
     
+    Y = X
     Y = Y.conj()
 
-    Sxx, Syy = np.zeros((Np, N_alpha)), np.zeros((Np, N_alpha))
+    Sxx, Syy = np.zeros((Np, N)), np.zeros((Np, N))
+    
+    print ('******************** \n')
+    print (X.shape, Y.shape, Sxx.shape, Syy.shape)
+    print (N_alpha)
 
     for a, alpha in enumerate(alpha_vec):
-        t_block = np.linspace(0, Np, 1, endpoint=False)
+        t_block = np.linspace(0+a, Np+a, 1, endpoint=False)
         Sxx[:, a], Syy[:, a] = calc_xspec_block(X[:, a], Y[:, a], t_block, alpha)
 
     # apply FFT shift
     Sxx = np.fft.fftshift(Sxx, axes=(-1))
     Syy = np.fft.fftshift(Syy, axes=(-1))
+    
+    M = np.sqrt(Sxx * Syy).T
+    print (M.shape)
 
+    S = np.ones((Np, 2*N), dtype=M.dtype)
+    
+    for q in range(-N//2, N//2):
+        for k in range(-Np//2, Np//2):         
+            alpha = q/N + k/Np
+            f = (k/Np - q/N) / 2
+            
+            m = int(Np * (f + 0.5))
+            l = int(N * (alpha + 1))
+            Sx[m, l] = M[q+N//2, k+Np//2]
 
-    return np.sqrt(Sxx * Syy)
+    return S
