@@ -75,3 +75,17 @@ def cyclic_periodogram(x, Np, alpha_vec):
     M = np.sqrt(Sxx * Syy)
     print (M.shape)
     return M.T
+
+
+coh = cyclic_periodogram_wht(x=s, Np=ww, alpha_vec=alphao, wht=True)
+SC = Sx / coh
+cp = np.amax(SC, axis=0)
+
+plt.plot(alphao, cp)
+plt.show()
+
+indices = find_n_largest_positions(cp, 8)
+indices.sort()
+
+print (indices)
+print (alphao[indices])
